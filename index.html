@@ -752,14 +752,6 @@
           <textarea id="editReminders"></textarea>
         </label>
         <label>
-          Weather
-          <input id="editWeather" placeholder="72°F | Partly Cloudy | Rochester, MA">
-        </label>
-        <label>
-          Forecast: day/temp/icon, comma-separated
-          <input id="editForecast" placeholder="Sat 72/59 ☁, Sun 75/61 ☼, Mon 78/63 ☁">
-        </label>
-        <label>
           Manual now playing
           <input id="editMusic" placeholder="Artist | Track | Album">
         </label>
@@ -792,6 +784,7 @@
     const VERIFIER_KEY = "jarvis.spotify.verifier";
     const STATE_KEY = "jarvis.spotify.state";
     const SPOTIFY_SCOPE = "user-read-currently-playing";
+    const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=41.73&longitude=-70.82&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=3";
 
     const defaults = {
       upcoming: [
@@ -851,8 +844,6 @@
       editOverlay: document.getElementById("editOverlay"),
       editUpcoming: document.getElementById("editUpcoming"),
       editReminders: document.getElementById("editReminders"),
-      editWeather: document.getElementById("editWeather"),
-      editForecast: document.getElementById("editForecast"),
       editMusic: document.getElementById("editMusic"),
       editSpotifyClientId: document.getElementById("editSpotifyClientId"),
       spotifyRedirect: document.getElementById("spotifyRedirect")
@@ -926,8 +917,6 @@
     function populateEdit() {
       els.editUpcoming.value = config.upcoming.map(item => `${item.time} | ${item.title}`).join("\n");
       els.editReminders.value = config.reminders.map(item => `${item.done ? "done" : "open"} | ${item.label} | ${item.time}`).join("\n");
-      els.editWeather.value = `${config.weather.temp} | ${config.weather.condition} | ${config.weather.location}`;
-      els.editForecast.value = config.weather.forecast.map(day => `${day.day} ${day.temp} ${day.icon}`).join(", ");
       els.editMusic.value = `${config.music.artist} | ${config.music.title} | ${config.music.album}`;
       els.editSpotifyClientId.value = config.spotifyClientId || "";
       els.spotifyRedirect.value = redirectUri();
@@ -936,7 +925,6 @@
     function applyEdit() {
       config.upcoming = parseUpcoming(els.editUpcoming.value);
       config.reminders = parseReminders(els.editReminders.value);
-      config.weather = parseWeather(els.editWeather.value, els.editForecast.value);
       config.music = parseMusic(els.editMusic.value);
       config.spotifyClientId = els.editSpotifyClientId.value.trim();
       saveConfig();
@@ -963,29 +951,6 @@
         }));
     }
 
-    function parseWeather(weatherValue, forecastValue) {
-      const parts = weatherValue.split("|").map(part => part.trim());
-      const forecast = forecastValue.split(",")
-        .map(part => part.trim())
-        .filter(Boolean)
-        .map(part => {
-          const bits = part.split(/\s+/);
-          return {
-            day: bits[0] || "",
-            temp: bits[1] || "",
-            icon: bits.slice(2).join(" ") || "☁"
-          };
-        });
-
-      return {
-        temp: parts[0] || defaults.weather.temp,
-        condition: parts[1] || defaults.weather.condition,
-        location: parts[2] || defaults.weather.location,
-        icon: weatherIconFor(parts[1] || ""),
-        forecast: forecast.length ? forecast : defaults.weather.forecast
-      };
-    }
-
     function parseMusic(value) {
       const parts = value.split("|").map(part => part.trim());
       return {
@@ -1002,6 +967,76 @@
       if (/sun|clear/i.test(condition)) return "☼";
       if (/snow/i.test(condition)) return "❄";
       return "☁";
+    }
+
+    function weatherFromCode(code, isDay = 1) {
+      const map = {
+        0: ["Clear", isDay ? "☼" : "☾"],
+        1: ["Mostly Clear", isDay ? "☼" : "☾"],
+        2: ["Partly Cloudy", "☁"],
+        3: ["Cloudy", "☁"],
+        45: ["Fog", "≋"],
+        48: ["Rime Fog", "≋"],
+        51: ["Light Drizzle", "☂"],
+        53: ["Drizzle", "☂"],
+        55: ["Heavy Drizzle", "☂"],
+        61: ["Light Rain", "☂"],
+        63: ["Rain", "☂"],
+        65: ["Heavy Rain", "☂"],
+        71: ["Light Snow", "❄"],
+        73: ["Snow", "❄"],
+        75: ["Heavy Snow", "❄"],
+        80: ["Rain Showers", "☂"],
+        81: ["Rain Showers", "☂"],
+        82: ["Heavy Showers", "☂"],
+        95: ["Thunderstorm", "⚡"],
+        96: ["Thunderstorm", "⚡"],
+        99: ["Thunderstorm", "⚡"]
+      };
+
+      const fallback = ["Updating", "☁"];
+      const [condition, icon] = map[code] || fallback;
+      return { condition, icon };
+    }
+
+    async function fetchWeather() {
+      try {
+        const response = await fetch(WEATHER_URL, { cache: "no-store" });
+
+        if (!response.ok) {
+          throw new Error(`Weather failed: ${response.status}`);
+        }
+
+        const weather = await response.json();
+        const current = weather.current || {};
+        const currentCode = weatherFromCode(current.weather_code, current.is_day);
+        const daily = weather.daily || {};
+        const forecast = (daily.time || []).slice(0, 3).map((date, index) => {
+          const code = weatherFromCode(daily.weather_code?.[index], 1);
+          const high = Math.round(daily.temperature_2m_max?.[index] || 0);
+          const low = Math.round(daily.temperature_2m_min?.[index] || 0);
+
+          return {
+            day: new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday: "short" }).toUpperCase(),
+            temp: `${high}°/${low}°`,
+            icon: code.icon
+          };
+        });
+
+        config.weather = {
+          temp: `${Math.round(current.temperature_2m)}°F`,
+          condition: currentCode.condition,
+          location: "Rochester, MA",
+          icon: currentCode.icon,
+          forecast
+        };
+
+        render();
+        setFooter("Weather updated");
+      } catch (error) {
+        console.error(error);
+        setFooter("Weather feed unavailable");
+      }
     }
 
     function openEdit() {
@@ -1259,8 +1294,10 @@
     tickClock();
     setInterval(tickClock, 1000);
     render();
+    fetchWeather();
     handleSpotifyRedirect().then(fetchNowPlaying);
     progressTimer = setInterval(fetchNowPlaying, 30000);
+    setInterval(fetchWeather, 600000);
   </script>
 </body>
 </html>
