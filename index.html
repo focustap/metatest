@@ -476,19 +476,27 @@
       align-content: start;
     }
 
-    button {
+    button,
+    .button-link {
+      display: inline-grid;
+      place-items: center;
       min-width: 0;
       height: 30px;
+      padding: 0 10px;
       border: 1px solid var(--line-soft);
       background: rgba(6, 29, 39, 0.78);
       color: var(--text);
       font: inherit;
       font-size: 11px;
+      line-height: 1;
+      text-decoration: none;
       cursor: pointer;
     }
 
     button.primary,
-    button:focus {
+    .button-link.primary,
+    button:focus,
+    .button-link:focus {
       border-color: var(--cyan);
       color: var(--cyan);
       outline: 4px solid rgba(255, 255, 255, 0.9);
@@ -790,7 +798,7 @@
           <button id="resetButton">Reset</button>
         </div>
         <div>
-          <button id="linkSpotifyButton">Link Spotify</button>
+          <a id="linkSpotifyButton" class="button-link" href="#" role="button">Link Spotify</a>
           <button id="saveButton" class="primary">Save</button>
         </div>
       </div>
@@ -802,7 +810,7 @@
     const TOKEN_KEY = "jarvis.spotify.token";
     const VERIFIER_KEY = "jarvis.spotify.verifier";
     const STATE_KEY = "jarvis.spotify.state";
-    const APP_VERSION = "2026.08.07.4";
+    const APP_VERSION = "2026.08.07.5";
     const SPOTIFY_SCOPE = "user-read-currently-playing";
     const SPOTIFY_POLL_MS = 5000;
     const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=41.73&longitude=-70.82&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=3";
@@ -844,6 +852,8 @@
     let config = loadConfig();
     let currentMusic = config.music;
     let spotifyFetchInFlight = false;
+    let preparedSpotifyAuthUrl = "";
+    let preparingSpotifyLink = null;
     let progressTimer = null;
     let spotifyPollTimer = null;
 
@@ -896,7 +906,8 @@
     }
 
     function redirectUri() {
-      return `${location.origin}${location.pathname}`;
+      const path = location.pathname.replace(/index\.html$/i, "");
+      return `${location.origin}${path}`;
     }
 
     function render() {
@@ -1075,6 +1086,7 @@
     function openEdit() {
       populateEdit();
       els.editOverlay.classList.add("open");
+      prepareSpotifyLink();
       document.getElementById("saveButton").focus();
     }
 
@@ -1083,7 +1095,74 @@
       document.querySelector(".nav .active").focus();
     }
 
-    async function linkSpotify() {
+    async function prepareSpotifyLink() {
+      if (preparingSpotifyLink) {
+        return preparingSpotifyLink;
+      }
+
+      preparingSpotifyLink = (async () => {
+        const link = document.getElementById("linkSpotifyButton");
+        config.spotifyClientId = els.editSpotifyClientId.value.trim() || defaults.spotifyClientId;
+        saveConfig();
+
+        if (!config.spotifyClientId) {
+          link.removeAttribute("href");
+          setFooter("Paste Spotify client ID first");
+          return "";
+        }
+
+        if (!window.crypto || !window.crypto.subtle) {
+          link.removeAttribute("href");
+          setFooter("Spotify link needs HTTPS browser support");
+          return "";
+        }
+
+        const verifier = randomString(64);
+        const challenge = await codeChallenge(verifier);
+        const state = randomString(24);
+        localStorage.setItem(VERIFIER_KEY, verifier);
+        localStorage.setItem(STATE_KEY, state);
+
+        const authUrl = new URL("https://accounts.spotify.com/authorize");
+        authUrl.search = new URLSearchParams({
+          response_type: "code",
+          client_id: config.spotifyClientId,
+          scope: SPOTIFY_SCOPE,
+          redirect_uri: redirectUri(),
+          code_challenge_method: "S256",
+          code_challenge: challenge,
+          state,
+          show_dialog: "true"
+        }).toString();
+
+        preparedSpotifyAuthUrl = authUrl.toString();
+        link.href = preparedSpotifyAuthUrl;
+        return preparedSpotifyAuthUrl;
+      })().finally(() => {
+        preparingSpotifyLink = null;
+      });
+
+      return preparingSpotifyLink;
+    }
+
+    async function linkSpotify(event) {
+      if (event) {
+        event.preventDefault();
+      }
+
+      if (preparedSpotifyAuthUrl) {
+        location.assign(preparedSpotifyAuthUrl);
+        return;
+      }
+
+      const authUrl = await prepareSpotifyLink();
+
+      if (authUrl) {
+        location.assign(authUrl);
+      }
+    }
+
+    async function linkSpotifyLegacy() {
       config.spotifyClientId = els.editSpotifyClientId.value.trim();
       saveConfig();
 
@@ -1380,6 +1459,10 @@
     document.getElementById("closeEditButton").addEventListener("click", closeEdit);
     document.getElementById("saveButton").addEventListener("click", applyEdit);
     document.getElementById("linkSpotifyButton").addEventListener("click", linkSpotify);
+    els.editSpotifyClientId.addEventListener("input", () => {
+      preparedSpotifyAuthUrl = "";
+      prepareSpotifyLink();
+    });
     document.getElementById("spotifyButton").addEventListener("click", fetchNowPlaying);
     document.getElementById("refreshButton").addEventListener("click", forceAppRefresh);
     document.getElementById("resetButton").addEventListener("click", () => {
