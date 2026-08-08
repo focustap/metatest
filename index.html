@@ -192,14 +192,9 @@
       min-width: 0;
     }
 
-    .reminders {
-      grid-column: 3;
-      grid-row: 1;
-    }
-
     .music {
       grid-column: 3;
-      grid-row: 2;
+      grid-row: 1 / 3;
     }
 
     .actions {
@@ -403,8 +398,8 @@
 
     .music-body {
       display: grid;
-      grid-template-columns: 50px minmax(0, 1fr);
-      gap: 8px;
+      grid-template-columns: 70px minmax(0, 1fr);
+      gap: 10px;
       align-items: start;
       min-width: 0;
     }
@@ -412,8 +407,8 @@
     .cover {
       display: grid;
       place-items: center;
-      width: 50px;
-      height: 50px;
+      width: 70px;
+      height: 70px;
       border: 1px solid rgba(255, 255, 255, 0.62);
       background:
         linear-gradient(rgba(17, 240, 255, 0.06) 1px, transparent 1px),
@@ -442,7 +437,7 @@
     }
 
     .track-title {
-      font-size: 12px;
+      font-size: 13px;
       line-height: 1.15;
     }
 
@@ -450,14 +445,14 @@
     .track-album,
     .spotify-state {
       color: var(--muted);
-      font-size: 9px;
-      line-height: 1.25;
+      font-size: 10px;
+      line-height: 1.35;
     }
 
     .progress {
       grid-column: 1 / -1;
-      height: 3px;
-      margin-top: 4px;
+      height: 4px;
+      margin-top: 7px;
       background: rgba(255, 255, 255, 0.12);
     }
 
@@ -472,15 +467,15 @@
     .music-controls {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 5px;
-      margin-top: 3px;
-      margin-bottom: 2px;
+      gap: 7px;
+      margin-top: 9px;
+      margin-bottom: 7px;
     }
 
     .music-controls button {
-      height: 17px;
+      height: 24px;
       padding: 0;
-      font-size: 10px;
+      font-size: 12px;
       color: var(--cyan);
     }
 
@@ -731,11 +726,6 @@
           </section>
         </section>
 
-        <section class="panel reminders">
-          <div class="panel-title">Reminders <span class="panel-icon">●</span></div>
-          <div class="list-compact" id="reminderList"></div>
-        </section>
-
         <section class="panel music">
           <div class="panel-title">Now Playing <span class="panel-icon">♫</span></div>
           <div class="music-body">
@@ -792,10 +782,6 @@
           <textarea id="editUpcoming"></textarea>
         </label>
         <label>
-          Reminders: done | label | time
-          <textarea id="editReminders"></textarea>
-        </label>
-        <label>
           Manual now playing
           <input id="editMusic" placeholder="Artist | Track | Album">
         </label>
@@ -823,7 +809,7 @@
 
   <script>
     const STORAGE_KEY = "jarvis.dashboard.v3";
-    const APP_VERSION = "2026.08.07.10";
+    const APP_VERSION = "2026.08.07.11";
     const SPOTIFY_POLL_MS = 5000;
     const SUPABASE_URL = "https://cwpruhtfdmwxthkekkfi.supabase.co";
     const SUPABASE_KEY = "sb_publishable_rnktDgYcvr1HsRhKGLGPgA_6VZI-GW_";
@@ -928,13 +914,15 @@
         </div>
       `).join("");
 
-      els.reminderList.innerHTML = config.reminders.slice(0, 4).map(item => `
-        <div class="reminder-row">
-          <i class="check ${item.done ? "done" : ""}"></i>
-          <div class="truncate">${escapeHtml(item.label)}</div>
-          <div class="reminder-time">${escapeHtml(item.time)}</div>
-        </div>
-      `).join("");
+      if (els.reminderList) {
+        els.reminderList.innerHTML = config.reminders.slice(0, 4).map(item => `
+          <div class="reminder-row">
+            <i class="check ${item.done ? "done" : ""}"></i>
+            <div class="truncate">${escapeHtml(item.label)}</div>
+            <div class="reminder-time">${escapeHtml(item.time)}</div>
+          </div>
+        `).join("");
+      }
 
       els.weatherIcon.textContent = config.weather.icon || "☁";
       els.weatherTemp.textContent = config.weather.temp;
@@ -971,14 +959,18 @@
 
     function populateEdit() {
       els.editUpcoming.value = config.upcoming.map(item => `${item.time} | ${item.title}`).join("\n");
-      els.editReminders.value = config.reminders.map(item => `${item.done ? "done" : "open"} | ${item.label} | ${item.time}`).join("\n");
+      if (els.editReminders) {
+        els.editReminders.value = config.reminders.map(item => `${item.done ? "done" : "open"} | ${item.label} | ${item.time}`).join("\n");
+      }
       els.editMusic.value = `${config.music.artist} | ${config.music.title} | ${config.music.album}`;
       els.editSpotifyClientId.value = "Supabase: spotify_now_playing";
     }
 
     function applyEdit() {
       config.upcoming = parseUpcoming(els.editUpcoming.value);
-      config.reminders = parseReminders(els.editReminders.value);
+      if (els.editReminders) {
+        config.reminders = parseReminders(els.editReminders.value);
+      }
       config.music = parseMusic(els.editMusic.value);
       currentMusic = config.music;
       saveConfig();
