@@ -403,17 +403,17 @@
 
     .music-body {
       display: grid;
-      grid-template-columns: 56px 1fr;
-      gap: 10px;
-      align-items: center;
+      grid-template-columns: 50px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
       min-width: 0;
     }
 
     .cover {
       display: grid;
       place-items: center;
-      width: 56px;
-      height: 56px;
+      width: 50px;
+      height: 50px;
       border: 1px solid rgba(255, 255, 255, 0.62);
       background:
         linear-gradient(rgba(17, 240, 255, 0.06) 1px, transparent 1px),
@@ -442,22 +442,22 @@
     }
 
     .track-title {
-      font-size: 13px;
-      line-height: 1.2;
+      font-size: 12px;
+      line-height: 1.15;
     }
 
     .track-artist,
     .track-album,
     .spotify-state {
       color: var(--muted);
-      font-size: 10px;
-      line-height: 1.4;
+      font-size: 9px;
+      line-height: 1.25;
     }
 
     .progress {
       grid-column: 1 / -1;
-      height: 4px;
-      margin-top: 7px;
+      height: 3px;
+      margin-top: 4px;
       background: rgba(255, 255, 255, 0.12);
     }
 
@@ -470,17 +470,17 @@
     }
 
     .music-controls {
-      grid-column: 1 / -1;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
-      margin-top: 5px;
+      gap: 5px;
+      margin-top: 3px;
+      margin-bottom: 2px;
     }
 
     .music-controls button {
-      height: 22px;
+      height: 17px;
       padding: 0;
-      font-size: 12px;
+      font-size: 10px;
       color: var(--cyan);
     }
 
@@ -744,14 +744,14 @@
               <div class="track-title truncate" id="trackTitle">Spotify not linked</div>
               <div class="track-artist truncate" id="trackArtist">Open Edit to connect</div>
               <div class="track-album truncate" id="trackAlbum">Manual fallback ready</div>
+              <div class="music-controls">
+                <button id="previousTrackButton" class="focusable" title="Previous" aria-label="Previous track">&lt;</button>
+                <button id="togglePlaybackButton" class="focusable" title="Play or pause" aria-label="Play or pause">II</button>
+                <button id="nextTrackButton" class="focusable" title="Next" aria-label="Next track">&gt;</button>
+              </div>
               <div class="spotify-state" id="spotifyState">Idle</div>
             </div>
             <div class="progress"><i id="trackProgress"></i></div>
-            <div class="music-controls">
-              <button id="previousTrackButton" class="focusable" title="Previous" aria-label="Previous track">&lt;</button>
-              <button id="togglePlaybackButton" class="focusable" title="Play or pause" aria-label="Play or pause">II</button>
-              <button id="nextTrackButton" class="focusable" title="Next" aria-label="Next track">&gt;</button>
-            </div>
           </div>
         </section>
 
@@ -823,7 +823,7 @@
 
   <script>
     const STORAGE_KEY = "jarvis.dashboard.v3";
-    const APP_VERSION = "2026.08.07.9";
+    const APP_VERSION = "2026.08.07.10";
     const SPOTIFY_POLL_MS = 5000;
     const SUPABASE_URL = "https://cwpruhtfdmwxthkekkfi.supabase.co";
     const SUPABASE_KEY = "sb_publishable_rnktDgYcvr1HsRhKGLGPgA_6VZI-GW_";
