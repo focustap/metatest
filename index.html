@@ -208,9 +208,10 @@
       grid-column: 2;
       grid-row: 3;
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
-      padding: 8px;
+      grid-template-columns: repeat(5, 30px);
+      justify-content: center;
+      gap: 7px;
+      padding: 10px;
       align-content: center;
     }
 
@@ -494,25 +495,37 @@
     .nav button {
       display: grid;
       place-items: center;
-      height: 50px;
+      width: 30px;
+      height: 38px;
+      padding: 0;
+      overflow: hidden;
       color: var(--muted);
       text-transform: uppercase;
     }
 
     .nav button span:first-child {
       color: inherit;
-      font-size: 18px;
+      font-size: 17px;
       line-height: 1;
     }
 
     .nav button span:last-child {
-      font-size: 8px;
-      letter-spacing: 1px;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
     }
 
     .nav button.active {
       border-color: var(--cyan);
       color: var(--cyan);
+    }
+
+    .nav button:focus {
+      outline-width: 3px;
+      outline-offset: 2px;
     }
 
     .bottombar {
@@ -722,11 +735,11 @@
         </section>
 
         <nav class="panel nav" aria-label="Display navigation">
-          <button class="focusable active" autofocus><span>⌂</span><span>Home</span></button>
-          <button class="focusable"><span>□</span><span>Ctrl</span></button>
-          <button class="focusable"><span>▦</span><span>Apps</span></button>
-          <button class="focusable" id="spotifyButton"><span>♪</span><span>Music</span></button>
-          <button class="focusable" id="editButton"><span>⚙</span><span>Edit</span></button>
+          <button class="focusable active" autofocus title="Home" aria-label="Home"><span>⌂</span><span>Home</span></button>
+          <button class="focusable" title="Control" aria-label="Control"><span>□</span><span>Control</span></button>
+          <button class="focusable" title="Apps" aria-label="Apps"><span>▦</span><span>Apps</span></button>
+          <button class="focusable" id="spotifyButton" title="Music" aria-label="Music"><span>♪</span><span>Music</span></button>
+          <button class="focusable" id="editButton" title="Edit" aria-label="Edit"><span>⚙</span><span>Edit</span></button>
         </nav>
       </section>
 
@@ -818,7 +831,7 @@
         progress: 38,
         state: "Manual"
       },
-      spotifyClientId: ""
+      spotifyClientId: "bb237b6b2b0b4189afe6e0ad901705b8"
     };
 
     let config = loadConfig();
@@ -855,10 +868,17 @@
 
     function loadConfig() {
       try {
-        return {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const merged = {
           ...defaults,
-          ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+          ...stored
         };
+
+        if (!merged.spotifyClientId) {
+          merged.spotifyClientId = defaults.spotifyClientId;
+        }
+
+        return merged;
       } catch {
         return { ...defaults };
       }
