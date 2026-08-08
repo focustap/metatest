@@ -51,7 +51,7 @@ http://127.0.0.1:8089/callback
 Open this URL in your desktop browser, replacing `CLIENT_ID`:
 
 ```text
-https://accounts.spotify.com/authorize?response_type=code&client_id=CLIENT_ID&scope=user-read-currently-playing&redirect_uri=http%3A%2F%2F127.0.0.1%3A8089%2Fcallback
+https://accounts.spotify.com/authorize?response_type=code&client_id=CLIENT_ID&scope=user-read-currently-playing%20user-modify-playback-state&redirect_uri=http%3A%2F%2F127.0.0.1%3A8089%2Fcallback
 ```
 
 Approve Spotify. Your browser will fail to load `127.0.0.1`, but the address bar will contain:
@@ -85,6 +85,8 @@ Invoke-RestMethod `
 
 Copy the returned `refresh_token` into the Supabase secret `SPOTIFY_REFRESH_TOKEN`.
 
+The `user-modify-playback-state` scope lets JARVIS use the Spotify previous, play/pause, and next controls.
+
 ## 5. Run it once
 
 Invoke:
@@ -94,6 +96,14 @@ https://cwpruhtfdmwxthkekkfi.supabase.co/functions/v1/spotify-now-playing
 ```
 
 Then refresh the JARVIS site.
+
+Playback action URLs:
+
+```text
+https://cwpruhtfdmwxthkekkfi.supabase.co/functions/v1/swift-endpoint?action=previous
+https://cwpruhtfdmwxthkekkfi.supabase.co/functions/v1/swift-endpoint?action=toggle
+https://cwpruhtfdmwxthkekkfi.supabase.co/functions/v1/swift-endpoint?action=next
+```
 
 ## 6. Keep it fresh
 

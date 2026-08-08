@@ -469,6 +469,21 @@
       box-shadow: 0 0 10px rgba(17, 240, 255, 0.7);
     }
 
+    .music-controls {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 5px;
+    }
+
+    .music-controls button {
+      height: 22px;
+      padding: 0;
+      font-size: 12px;
+      color: var(--cyan);
+    }
+
     .actions-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -732,6 +747,11 @@
               <div class="spotify-state" id="spotifyState">Idle</div>
             </div>
             <div class="progress"><i id="trackProgress"></i></div>
+            <div class="music-controls">
+              <button id="previousTrackButton" class="focusable" title="Previous" aria-label="Previous track">&lt;</button>
+              <button id="togglePlaybackButton" class="focusable" title="Play or pause" aria-label="Play or pause">II</button>
+              <button id="nextTrackButton" class="focusable" title="Next" aria-label="Next track">&gt;</button>
+            </div>
           </div>
         </section>
 
@@ -803,7 +823,7 @@
 
   <script>
     const STORAGE_KEY = "jarvis.dashboard.v3";
-    const APP_VERSION = "2026.08.07.8";
+    const APP_VERSION = "2026.08.07.9";
     const SPOTIFY_POLL_MS = 5000;
     const SUPABASE_URL = "https://cwpruhtfdmwxthkekkfi.supabase.co";
     const SUPABASE_KEY = "sb_publishable_rnktDgYcvr1HsRhKGLGPgA_6VZI-GW_";
@@ -867,6 +887,7 @@
       trackArtist: document.getElementById("trackArtist"),
       trackAlbum: document.getElementById("trackAlbum"),
       trackProgress: document.getElementById("trackProgress"),
+      togglePlaybackButton: document.getElementById("togglePlaybackButton"),
       spotifyState: document.getElementById("spotifyState"),
       spotifyStatus: document.getElementById("spotifyStatus"),
       footerStatus: document.getElementById("footerStatus"),
@@ -938,6 +959,8 @@
       els.trackAlbum.textContent = music.album || "";
       els.spotifyState.textContent = music.state || "Manual";
       els.trackProgress.style.setProperty("--progress", `${music.progress || 0}%`);
+      els.togglePlaybackButton.textContent = music.isPlaying ? "II" : ">";
+      els.togglePlaybackButton.setAttribute("aria-label", music.isPlaying ? "Pause Spotify" : "Play Spotify");
 
       if (music.cover) {
         els.coverBox.innerHTML = `<img src="${music.cover}" alt="">`;
@@ -1081,7 +1104,7 @@
       document.querySelector(".nav .active").focus();
     }
 
-    async function refreshSpotifyFeed() {
+    async function refreshSpotifyFeed(action = "") {
       if (spotifyRefreshInFlight) {
         return;
       }
@@ -1089,7 +1112,14 @@
       spotifyRefreshInFlight = true;
 
       try {
-        await fetch(`${SPOTIFY_REFRESH_URL}?v=${Date.now()}`, {
+        const url = new URL(SPOTIFY_REFRESH_URL);
+        url.searchParams.set("v", Date.now().toString());
+
+        if (action) {
+          url.searchParams.set("action", action);
+        }
+
+        await fetch(url.toString(), {
           cache: "no-store",
           mode: "no-cors"
         });
@@ -1109,7 +1139,7 @@
 
       try {
         if (options.refresh !== false) {
-          await refreshSpotifyFeed();
+          await refreshSpotifyFeed(options.action || "");
         }
 
         const response = await fetch(SPOTIFY_FEED_URL, {
@@ -1166,6 +1196,11 @@
       } finally {
         spotifyFetchInFlight = false;
       }
+    }
+
+    async function runSpotifyCommand(action) {
+      setFooter(`Spotify ${action}`);
+      await fetchNowPlaying({ action });
     }
 
     function updateSpotifyProgress() {
@@ -1253,6 +1288,9 @@
     document.getElementById("saveButton").addEventListener("click", applyEdit);
     document.getElementById("spotifyButton").addEventListener("click", fetchNowPlaying);
     document.getElementById("linkSpotifyButton").addEventListener("click", fetchNowPlaying);
+    document.getElementById("previousTrackButton").addEventListener("click", () => runSpotifyCommand("previous"));
+    document.getElementById("togglePlaybackButton").addEventListener("click", () => runSpotifyCommand("toggle"));
+    document.getElementById("nextTrackButton").addEventListener("click", () => runSpotifyCommand("next"));
     document.getElementById("refreshButton").addEventListener("click", forceAppRefresh);
     document.getElementById("resetButton").addEventListener("click", () => {
       config = JSON.parse(JSON.stringify(defaults));

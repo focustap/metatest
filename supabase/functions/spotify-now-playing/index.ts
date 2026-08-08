@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action");
     const supabaseUrl = requiredEnv("SUPABASE_URL");
     const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
     const clientId = requiredEnv("SPOTIFY_CLIENT_ID");
@@ -55,6 +57,11 @@ Deno.serve(async (req) => {
       clientSecret,
       refreshToken,
     );
+
+    if (action) {
+      await runSpotifyAction(accessToken, action);
+      await wait(450);
+    }
 
     const playback = await fetchSpotifyPlayback(accessToken);
     const row = spotifyPlaybackToRow(playback);
@@ -68,7 +75,7 @@ Deno.serve(async (req) => {
       throw error;
     }
 
-    return json({ ok: true, row });
+    return json({ ok: true, action: action || "refresh", row });
   } catch (error) {
     console.error(error);
     return json({ ok: false, error: String(error) }, 500);
@@ -111,6 +118,55 @@ async function refreshSpotifyAccessToken(
   return token.access_token as string;
 }
 
+async function runSpotifyAction(accessToken: string, action: string) {
+  const normalized = action.toLowerCase();
+
+  if (normalized === "toggle") {
+    const playback = await fetchSpotifyPlayback(accessToken);
+    return runSpotifyAction(accessToken, playback?.is_playing ? "pause" : "play");
+  }
+
+  const actions: Record<string, { method: string; url: string }> = {
+    pause: {
+      method: "PUT",
+      url: "https://api.spotify.com/v1/me/player/pause",
+    },
+    play: {
+      method: "PUT",
+      url: "https://api.spotify.com/v1/me/player/play",
+    },
+    next: {
+      method: "POST",
+      url: "https://api.spotify.com/v1/me/player/next",
+    },
+    previous: {
+      method: "POST",
+      url: "https://api.spotify.com/v1/me/player/previous",
+    },
+  };
+
+  const command = actions[normalized];
+
+  if (!command) {
+    throw new Error(`Unsupported Spotify action: ${action}`);
+  }
+
+  const response = await fetch(command.url, {
+    method: command.method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 204) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Spotify ${normalized} failed: ${response.status}`);
+  }
+}
+
 async function fetchSpotifyPlayback(accessToken: string) {
   const response = await fetch(
     "https://api.spotify.com/v1/me/player/currently-playing?additional_types=track,episode",
@@ -130,6 +186,10 @@ async function fetchSpotifyPlayback(accessToken: string) {
   }
 
   return await response.json() as SpotifyPlayback;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function spotifyPlaybackToRow(playback: SpotifyPlayback | null) {
