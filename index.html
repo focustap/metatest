@@ -803,10 +803,11 @@
 
   <script>
     const STORAGE_KEY = "jarvis.dashboard.v3";
-    const APP_VERSION = "2026.08.07.7";
+    const APP_VERSION = "2026.08.07.8";
     const SPOTIFY_POLL_MS = 5000;
     const SUPABASE_URL = "https://cwpruhtfdmwxthkekkfi.supabase.co";
     const SUPABASE_KEY = "sb_publishable_rnktDgYcvr1HsRhKGLGPgA_6VZI-GW_";
+    const SPOTIFY_REFRESH_URL = `${SUPABASE_URL}/functions/v1/swift-endpoint`;
     const SPOTIFY_FEED_URL = `${SUPABASE_URL}/rest/v1/spotify_now_playing?id=eq.main&select=*`;
     const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=41.73&longitude=-70.82&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=3";
 
@@ -847,6 +848,7 @@
     let config = loadConfig();
     let currentMusic = config.music;
     let spotifyFetchInFlight = false;
+    let spotifyRefreshInFlight = false;
     let progressTimer = null;
     let spotifyPollTimer = null;
 
@@ -1079,7 +1081,26 @@
       document.querySelector(".nav .active").focus();
     }
 
-    async function fetchNowPlaying() {
+    async function refreshSpotifyFeed() {
+      if (spotifyRefreshInFlight) {
+        return;
+      }
+
+      spotifyRefreshInFlight = true;
+
+      try {
+        await fetch(`${SPOTIFY_REFRESH_URL}?v=${Date.now()}`, {
+          cache: "no-store",
+          mode: "no-cors"
+        });
+      } catch (error) {
+        console.debug("Spotify refresh skipped", error);
+      } finally {
+        spotifyRefreshInFlight = false;
+      }
+    }
+
+    async function fetchNowPlaying(options = {}) {
       if (spotifyFetchInFlight) {
         return;
       }
@@ -1087,6 +1108,10 @@
       spotifyFetchInFlight = true;
 
       try {
+        if (options.refresh !== false) {
+          await refreshSpotifyFeed();
+        }
+
         const response = await fetch(SPOTIFY_FEED_URL, {
           cache: "no-store",
           headers: {
