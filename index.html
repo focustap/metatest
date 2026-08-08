@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, height=600, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="icon" href="data:,">
   <title>JARVIS</title>
 
@@ -782,7 +785,10 @@
       </div>
 
       <div class="edit-actions">
-        <button id="resetButton">Reset</button>
+        <div>
+          <button id="refreshButton">Refresh App</button>
+          <button id="resetButton">Reset</button>
+        </div>
         <div>
           <button id="linkSpotifyButton">Link Spotify</button>
           <button id="saveButton" class="primary">Save</button>
@@ -796,6 +802,7 @@
     const TOKEN_KEY = "jarvis.spotify.token";
     const VERIFIER_KEY = "jarvis.spotify.verifier";
     const STATE_KEY = "jarvis.spotify.state";
+    const APP_VERSION = "2026.08.07.4";
     const SPOTIFY_SCOPE = "user-read-currently-playing";
     const SPOTIFY_POLL_MS = 5000;
     const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=41.73&longitude=-70.82&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=3";
@@ -1324,6 +1331,43 @@
       }, 3500);
     }
 
+    async function forceAppRefresh() {
+      setFooter("Refreshing app");
+
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(registration => registration.unregister()));
+      }
+
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+      }
+
+      const refreshUrl = new URL(location.href);
+      refreshUrl.searchParams.set("v", `${APP_VERSION}-${Date.now()}`);
+      location.replace(refreshUrl.toString());
+    }
+
+    async function checkForAppUpdate() {
+      try {
+        const response = await fetch(`build.json?v=${Date.now()}`, { cache: "no-store" });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const build = await response.json();
+
+        if (build.version && build.version !== APP_VERSION) {
+          setFooter("New build found");
+          forceAppRefresh();
+        }
+      } catch (error) {
+        console.debug("Build check skipped", error);
+      }
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replace(/&/g, "&amp;")
@@ -1337,6 +1381,7 @@
     document.getElementById("saveButton").addEventListener("click", applyEdit);
     document.getElementById("linkSpotifyButton").addEventListener("click", linkSpotify);
     document.getElementById("spotifyButton").addEventListener("click", fetchNowPlaying);
+    document.getElementById("refreshButton").addEventListener("click", forceAppRefresh);
     document.getElementById("resetButton").addEventListener("click", () => {
       config = JSON.parse(JSON.stringify(defaults));
       currentMusic = config.music;
@@ -1363,9 +1408,11 @@
     tickClock();
     setInterval(tickClock, 1000);
     render();
+    checkForAppUpdate();
     fetchWeather();
     handleSpotifyRedirect().then(startSpotifyPolling);
     progressTimer = setInterval(updateSpotifyProgress, 1000);
+    setInterval(checkForAppUpdate, 300000);
     setInterval(fetchWeather, 600000);
   </script>
 </body>
